@@ -1,0 +1,44 @@
+name: Review
+
+on:
+  pull_request:
+    branches:
+      - master
+jobs:
+  build:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@master
+
+      - name: Setup Environment
+        run: echo "FILE_LIST=$(printf '"%s" ' chapters/*.md)" >> $GITHUB_ENV
+
+      - uses: docker://pandoc/latex:latest
+        with:
+          args: >-
+            --toc
+            --toc-depth=2
+            --webtex
+            --css=style.css
+            --metadata-file=metadata.yml
+            --wrap=none
+            --epub-cover-image=images/cover.png
+            -o ebook.epub
+            ${{ env.FILE_LIST }}
+
+      - name: Convert to mobi
+        run: |
+          sudo apt-get install calibre
+          ebook-convert ebook.epub ebook.mobi
+
+      - name: Upload Built File
+        uses: actions/upload-artifact@master
+        with:
+          name: ebook.epub
+          path: ./ebook.epub
+
+      - name: Upload Built File
+        uses: actions/upload-artifact@master
+        with:
+          name: ebook.mobi
+          path: ./ebook.mobi
