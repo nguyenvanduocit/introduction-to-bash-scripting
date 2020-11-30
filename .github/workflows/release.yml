@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+jobs:
+  build:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@master
+
+      - name: Setup Environment directory
+        run: |
+          echo "FILE_LIST=$(printf '"%s" ' chapters/*.md)" >> $GITHUB_ENV
+          echo "VERSION=$(echo $GITHUB_REF | cut -d / -f 3)" >> $GITHUB_ENV
+
+      - uses: docker://pandoc/latex:latest
+        with:
+          args: >-
+            --toc
+            --toc-depth=2
+            --webtex
+            --css=style.css
+            --metadata-file=metadata.yml
+            --wrap=none
+            --epub-cover-image=images/cover.png
+            -o ebook.epub
+            ${{ env.FILE_LIST }}
+      - name: Convert to mobi
+        run: |
+          sudo apt-get install calibre
+          ebook-convert ebook.epub ebook.mobi
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+
+      - name: Upload epub
+        uses: actions/upload-release-asset@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./ebook.epub
+          asset_name: ebook-${{ env.VERSION }}.epub
+          asset_content_type: application/epub+zip
+
+      - name: Upload mobile
+        uses: actions/upload-release-asset@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./ebook.mobi
+          asset_name: ebook-${{ env.VERSION }}.mobi
+          asset_content_type: application/x-mobipocket-ebook
